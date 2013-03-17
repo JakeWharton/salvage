@@ -1,34 +1,28 @@
 package com.jakewharton.salvage;
 
 import android.util.SparseArray;
+import android.util.SparseIntArray;
 import android.view.View;
 
 /**
- * The RecycleBin facilitates reuse of views across layouts. The RecycleBin has two levels of
- * storage: ActiveViews and ScrapViews. ActiveViews are those views which were onscreen at the
- * start of a layout. By construction, they are displaying current information. At the end of
- * layout, all views in ActiveViews are demoted to ScrapViews. ScrapViews are old views that
- * could potentially be used by the adapter to avoid allocating views unnecessarily.
+ * The recycle bin facilitates reuse of views across layouts. There are two levels of storage:
+ * active views and scrap views. Active views are those views which are currently being used on
+ * screen. Scrap views are old views that could potentially be used to avoid allocating views
+ * unnecessarily.
  * <p>
  * This class was taken from Android's implementation of {@link android.widget.AbsListView} which
  * is copyrighted 2006 The Android Open Source Project.
  */
 public class RecycleBin {
-  /**
-   * Views that were on screen at the start of layout. This array is populated at the start of
-   * layout, and at the end of layout all view in activeViews are moved to scrapViews.
-   * Views in activeViews represent a contiguous range of Views, with position of the first
-   * view store in mFirstActivePosition.
-   */
-  private View[] activeViews = new View[0];
-  private int[] activeViewTypes = new int[0];
+  /** Views that are currently in use by the consumer on screen. */
+  private SparseArray<View> activeViews = new SparseArray<View>();
+  private SparseIntArray activeViewTypes = new SparseIntArray();
 
-  /** Unsorted views that can be used by the adapter as a convert view. */
+  /** Unsorted views that can be used as a convert view. */
   private SparseArray<View>[] scrapViews;
+  private SparseArray<View> currentScrapViews;
 
   private int viewTypeCount;
-
-  private SparseArray<View> currentScrapViews;
 
   public void setViewTypeCount(int viewTypeCount) {
     if (viewTypeCount < 1) {
@@ -49,7 +43,7 @@ public class RecycleBin {
   }
 
   /** @return A view from the ScrapViews collection. These are unordered. */
-  View getScrapView(int position, int viewType) {
+  public View getScrapView(int position, int viewType) {
     if (viewTypeCount == 1) {
       return retrieveFromScrap(currentScrapViews, position);
     } else if (viewType >= 0 && viewType < scrapViews.length) {
@@ -59,11 +53,14 @@ public class RecycleBin {
   }
 
   /**
-   * Put a view into the ScrapViews list. These views are unordered.
+   * Put a view into the scrap view list. These views are unordered.
    *
    * @param scrap The view to add
+   * @param position The position for which this view was used.
    */
-  void addScrapView(View scrap, int position, int viewType) {
+  public void addScrapView(View scrap, int position) {
+    int viewType = activeViewTypes.get(position);
+
     if (viewTypeCount == 1) {
       currentScrapViews.put(position, scrap);
     } else {
@@ -73,21 +70,33 @@ public class RecycleBin {
     scrap.setAccessibilityDelegate(null);
   }
 
-  /** Move all views remaining in activeViews to scrapViews. */
-  void scrapActiveViews() {
-    final View[] activeViews = this.activeViews;
-    final int[] activeViewTypes = this.activeViewTypes;
+  /**
+   * Put a view into the active view list.
+   *
+   * @param active The view to add.
+   * @param position The position at which this view is used.
+   * @param viewType The view type for this position.
+   */
+  public void addActiveView(View active, int position, int viewType) {
+    activeViews.put(position, active);
+    activeViewTypes.put(position, viewType);
+  }
+
+  /** Move all views remaining in active views to scrap views. */
+  public void scrapActiveViews() {
+    final SparseArray<View> activeViews = this.activeViews;
+    final SparseIntArray activeViewTypes = this.activeViewTypes;
     final boolean multipleScraps = viewTypeCount > 1;
 
     SparseArray<View> scrapViews = currentScrapViews;
-    final int count = activeViews.length;
+    final int count = activeViews.size();
     for (int i = count - 1; i >= 0; i--) {
-      final View victim = activeViews[i];
+      final View victim = activeViews.get(i);
       if (victim != null) {
-        int whichScrap = activeViewTypes[i];
+        int whichScrap = activeViewTypes.get(i);
 
-        activeViews[i] = null;
-        activeViewTypes[i] = -1;
+        activeViews.delete(i);
+        activeViewTypes.delete(i);
 
         if (!shouldRecycleViewType(whichScrap)) {
           continue;
@@ -110,7 +119,7 @@ public class RecycleBin {
    * (This can happen if an adapter does not recycle its views).
    */
   private void pruneScrapViews() {
-    final int maxViews = activeViews.length;
+    final int maxViews = activeViews.size();
     final int viewTypeCount = this.viewTypeCount;
     final SparseArray<View>[] scrapViews = this.scrapViews;
     for (int i = 0; i < viewTypeCount; ++i) {
