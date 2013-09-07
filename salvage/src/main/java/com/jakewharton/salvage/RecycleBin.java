@@ -70,7 +70,9 @@ public class RecycleBin {
       scrapViews[viewType].put(position, scrap);
     }
 
-    scrap.setAccessibilityDelegate(null);
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+        scrap.setAccessibilityDelegate(null);
+    }
   }
 
   /** Move all views remaining in activeViews to scrapViews. */
@@ -98,7 +100,9 @@ public class RecycleBin {
         }
         scrapViews.put(i, victim);
 
-        victim.setAccessibilityDelegate(null);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+            victim.setAccessibilityDelegate(null);
+        }
       }
     }
 
@@ -119,7 +123,7 @@ public class RecycleBin {
       final int extras = size - maxViews;
       size--;
       for (int j = 0; j < extras; j++) {
-        scrapPile.removeAt(size--);
+        scrapPile.remove(scrapPile.keyAt(size--));
       }
     }
   }
@@ -129,16 +133,16 @@ public class RecycleBin {
     if (size > 0) {
       // See if we still have a view for this position.
       for (int i = 0; i < size; i++) {
-        View view = scrapViews.get(i);
         int fromPosition = scrapViews.keyAt(i);
+        View view = scrapViews.get(fromPosition);
         if (fromPosition == position) {
-          scrapViews.remove(i);
+          scrapViews.remove(fromPosition);
           return view;
         }
       }
       int index = size - 1;
       View r = scrapViews.valueAt(index);
-      scrapViews.removeAt(index);
+      scrapViews.remove(scrapViews.keyAt(index));
       return r;
     } else {
       return null;
